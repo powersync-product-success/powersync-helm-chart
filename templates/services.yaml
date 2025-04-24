@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ include "powersync-helm-chart-demo.fullname" . }}
+    {{- include "powersync-helm-chart-demo.labels" . | nindent 4 }}
+  name: {{ include "powersync-helm-chart-demo.fullname" . }}
+  namespace: {{ .Values.namespace }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http
+    - name: metrics
+      port: 9464
+      protocol: TCP
+      targetPort: metrics
+  selector:
+    app: {{ include "powersync-helm-chart-demo.fullname" . }}-api
+---
+# Just for scraping metrics with prometheus. Can be excluded if not needed.
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ include "powersync-helm-chart-demo.fullname" . }}-replication
+    {{- include "powersync-helm-chart-demo.labels" . | nindent 4 }}
+  name: {{ include "powersync-helm-chart-demo.fullname" . }}-replication
+  namespace: {{ .Values.namespace }}
+spec:
+  ports:
+    - name: metrics
+      port: 9464
+      protocol: TCP
+      targetPort: metrics
+  selector:
+    app: {{ include "powersync-helm-chart-demo.fullname" . }}-replication

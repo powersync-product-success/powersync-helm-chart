@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  labels:
+    app: {{ include "powersync-helm-chart-demo.fullname" . }}
+    {{- include "powersync-helm-chart-demo.labels" . | nindent 4 }}
+  name: {{ include "powersync-helm-chart-demo.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: {{ include "powersync-helm-chart-demo.fullname" . }}
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+{{- end }}

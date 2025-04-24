@@ -1,0 +1,163 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ include "powersync-helm-chart-demo.fullname" . }}-replication
+    {{- include "powersync-helm-chart-demo.labels" . | nindent 4 }}
+  name: {{ include "powersync-helm-chart-demo.fullname" . }}-replication
+  namespace: {{ .Values.namespace }}
+spec:
+  # NB: Do not run more than 1 replication pod.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "powersync-helm-chart-demo.fullname" . }}-replication
+  strategy:
+    rollingUpdate:
+      maxSurge: 40%
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: default
+      labels:
+        app: {{ include "powersync-helm-chart-demo.fullname" . }}-replication
+    spec:
+      containers:
+        - args:
+            - start
+            - -r
+            - sync
+          env:
+            # NB: update this value if you change the memory resource constraints.
+            - name: NODE_OPTIONS
+              value: {{ .Values.replication.nodeOptions }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "powersync-helm-chart-demo.fullname" . }}-base-env
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - sleep 5
+          livenessProbe:
+            exec:
+              command:
+                - cat
+                - /app/.probes/poll
+            failureThreshold: 5
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 30
+          name: default
+          ports:
+            - containerPort: 9464
+              name: metrics
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /app/.probes/ready
+            failureThreshold: 5
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 30
+          resources:
+            {{- toYaml .Values.replication.resources | nindent 12 }}
+          startupProbe:
+            exec:
+              command:
+                - cat
+                - /app/.probes/startup
+            failureThreshold: 200
+            initialDelaySeconds: 1
+            periodSeconds: 1
+            successThreshold: 1
+            timeoutSeconds: 1
+          volumeMounts:
+            - mountPath: /powersync/config
+              name: config-volume
+            - mountPath: /powersync/sync_rules
+              name: sync-rules-volume
+      volumes:
+        - name: config-volume
+          secret:
+            defaultMode: 420
+            secretName: {{ include "powersync-helm-chart-demo.fullname" . }}-config
+        - configMap:
+            defaultMode: 420
+            name: {{ include "powersync-helm-chart-demo.fullname" . }}-sync-rules
+          name: sync-rules-volume
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ include "powersync-helm-chart-demo.fullname" . }}
+    {{- include "powersync-helm-chart-demo.labels" . | nindent 4 }}
+  name: {{ include "powersync-helm-chart-demo.fullname" . }}-api
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "powersync-helm-chart-demo.fullname" . }}-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 40%
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: default
+      labels:
+        app: {{ include "powersync-helm-chart-demo.fullname" . }}-api
+    spec:
+      containers:
+        - args:
+            - start
+            - -r
+            - api
+          env:
+            # NB: update this value if you change the memory resource constraints.
+            - name: NODE_OPTIONS
+              value: {{ .Values.api.nodeOptions }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "powersync-helm-chart-demo.fullname" . }}-base-env
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - sleep 5
+          name: default
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 9464
+              name: metrics
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /powersync/config
+              name: config-volume
+      volumes:
+        - name: config-volume
+          secret:
+            defaultMode: 420
+            secretName: {{ include "powersync-helm-chart-demo.fullname" . }}-config

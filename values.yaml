@@ -1,0 +1,115 @@
+# PowerSync Helm Chart Default Values
+namespace: powersync-poc
+
+# Image settings
+image:
+  repository: journeyapps/powersync-service
+  tag: "1.4.0"
+  pullPolicy: IfNotPresent
+
+# API deployment settings
+api:
+  replicas: 2
+  resources:
+    limits:
+      cpu: "1"
+      memory: 360Mi
+    requests:
+      cpu: 100m
+      memory: 360Mi
+  nodeOptions: "--max-old-space-size=330"
+
+# Replication deployment settings
+replication:
+  resources:
+    limits:
+      cpu: "1"
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  nodeOptions: "--max-old-space-size=482"
+
+# Service settings
+service:
+  type: ClusterIP
+
+# Ingress settings
+ingress:
+  enabled: true
+  className: ingress-nginx
+  host: YOUR_FQDN_HERE.example.com
+  tls:
+    enabled: true
+    secretName: your-certificate-secret
+
+# PowerSync Config
+powersyncConfig:
+  storage:
+    type: "mongodb"
+    uri: "mongodb+srv://YOUR_BUCKET_STORAGE.mongodb.net"
+    username: "YOUR_MONGO_DB_USER"
+    password: "YOUR_PASSWORD"
+    database: "YOUR_DATABASE_NAME"
+  replication:
+    connections:
+      - type: "mongodb"
+        uri: "mongodb+srv://FIXME:ASGDFGFDSGHFDHSDFH@YOUR_SOURCE_MONGODB.mongodb.net/"
+        database: "powersync_demo_source"
+        username: "FIXME"
+        password: "ASGDFGFDSGHFDHSDFH"
+        reject_ip_ranges:
+          - "local"
+        tag: "default"
+        post_images: "off"
+  dev:
+    demo_auth: false
+  api:
+    tokens:
+      - "STRIPPED"
+      - "STRIPPEDTWO"
+  client_auth:
+    jwks:
+      keys:
+        - kty: "oct"
+          alg: "HS256"
+          kid: "boschpoc"
+          k: "UNuh4zrTh2Nr-n25ffnZsf9xGFQI3RVvBe27kW56_ms"
+    jwks_uri:
+      - "YOUR JWKS URL IF APPROPRIATE"
+    jwks_reject_ip_ranges:
+      - "local"
+    supabase: false
+    audience:
+      - "https://YOUR_FQDN.example.com"
+  migrations:
+    disable_auto_migration: true
+  port: 8080
+  sync_rules:
+    path: "/powersync/sync_rules/sync_rules.yaml"
+    exit_on_error: false
+  telemetry:
+    disable_telemetry_sharing: false
+  parameters:
+    custom-write-checkpoints: false
+
+# Sync Rules
+syncRules:
+  data: |-
+    # Define sync rules to control which data is synced to each user
+    # See the docs: https://docs.powersync.com/usage/sync-rules
+    bucket_definitions:
+      global:
+        data:
+          # mongodb uses _id as the primary key. * excludes _ fields. 
+          - select _id as id, * from lists
+          - select _id as id, * from todos
+
+# Environment variables
+env:
+  LOG_FORMAT: "json"
+  METRICS_PORT: "9464"
+  MICRO_ENVIRONMENT_NAME: "production"
+  MICRO_PROBE_TYPE: "fs"
+  MICRO_SERVICE_NAME: "powersync"
+  POWERSYNC_CONFIG_PATH: "/powersync/config/config.json"
